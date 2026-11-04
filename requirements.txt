@@ -1,0 +1,11 @@
+Django>=5.2,<5.3
+djangorestframework
+djangorestframework-simplejwt
+mysqlclient
+python-dotenv
+requests
+celery
+redis
+drf-spectacular
+django-cors-headers
+gunicorn
