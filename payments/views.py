@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Sum
 
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.views import APIView
 from rest_framework.generics import (
     RetrieveAPIView,
@@ -34,6 +35,20 @@ from providers.services import get_payment_provider
 class PaymentCreateView(APIView):
 
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+            request=CreatePaymentSerializer,
+            responses={202: PaymentSerializer},
+            parameters=[
+                OpenApiParameter(
+                    name="Idempotency-Key",
+                    type=str,
+                    location=OpenApiParameter.HEADER,
+                    required=True,
+                    description="A valid UUID for idempotency"
+                )
+            ]
+        )
 
     def post(self, request):
 
@@ -82,10 +97,6 @@ class PaymentCreateView(APIView):
         # Create payment while locking the loan row.
         try:
             with transaction.atomic():
-
-                provider_service = get_payment_provider(payment.provider)
-                provider_response = provider_service.initiate_payment(payment)
-
                 loan = Loan.objects.select_for_update().get(
                     id=data["loan_id"],
                     customer=request.user,
@@ -121,6 +132,9 @@ class PaymentCreateView(APIView):
                     currency=loan.currency,
                     status=Payment.Status.PENDING
                 )
+
+                provider_service = get_payment_provider(payment.provider)
+                provider_response = provider_service.initiate_payment(payment)
 
         except (RequestException, ValueError) as error:
             payment.status = Payment.Status.FAILED
